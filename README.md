@@ -4,7 +4,13 @@ A learning-to-optimize pipeline for New York's hourly generation plan.
 
 Public load, price, and outage data go in. A model learns generation costs from that data. A linear program then sets the hourly plan. This is a public-data proxy. It is not the grid operator's real unit-commitment model, because bids and the full security-constrained problem are not public.
 
-The comparison that matters is the extra cost above the cheapest feasible plan on the same public data. On the 2023–2024 test hours, adding transmission limits and a reserve margin cut that extra cost by 47%, from $52,755 per hour to $28,189 per hour. The whole generation bill only fell from $463,109 to $437,598 per hour, about 5.5%. Every selected run solved every hour.
+## Conclusion
+
+The cost result came from the constraints, not from a more flexible learned model.
+
+On the 2023–2024 test hours, updating the fleet data by itself made the plan more expensive. The first large drop came from enforcing transmission limits between zones. Adding day-ahead stress on top of that, without outages, gave some of the gain back. Scheduled outages and then a fixed 2% reserve margin kept cutting the extra cost. That last plan, A6c, is the one that was kept: extra cost fell 47%, from $52,755 per hour to $28,189 per hour. The generation bill only fell from $463,109 to $437,598 per hour, about 5.5%, because the extra cost is a small slice of the bill. Every selected run solved every hour.
+
+Letting the model choose the reserve, or pushing it to match the published fuel mix more closely, spent that gain. The closer fuel-mix variant cost about $20,500 per hour more in extra cost than A6c. A fixed reserve margin beat a learned one.
 
 ## Result
 
