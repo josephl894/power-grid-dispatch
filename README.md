@@ -1,14 +1,33 @@
 # Power Grid Dispatch Model
 
-Every hour, New York has to decide which power plants turn on. The people who actually make that decision see private bids from the plant owners. I did not. I could see the public record: how much electricity people used, what prices did, and which plants were offline.
+Every hour, New York has to decide which power plants turn on, and how much each one runs. The people who make that call see private bids from the plant owners. I did not. I had the public record: how much electricity each region used, what fuel prices did, which plants were scheduled offline, and how hard the lines between regions were working.
 
-The job was to build an hourly plan from that public record and see if it could beat the old schedule on cost.
+The job was to build an hourly plan from that record and see if it could beat the old schedule on cost.
 
-I trained a model to estimate what it costs to run each kind of plant. An optimizer then picked the plan for each hour. I did not let it treat the state like one big copper plate. Power lines between regions have limits, and some capacity has to sit in reserve instead of running flat out.
+A plan only counts if the grid could actually run it. I held every version to the same four rules.
+
+- **Meet demand.** Each region has to get the power it is expected to use that hour. Power can move between regions, but what leaves one region has to arrive in another.
+- **Respect the lines.** The lines between regions have published limits. The plan cannot push more power across a line than that line can carry.
+- **Stay inside the plants.** A plant cannot run above the capacity that is actually available, and it cannot jump from last hour's output faster than plants of that type have historically moved.
+- **Hold a reserve.** Some capacity has to sit ready in case a plant trips or demand comes in high. The plan I kept holds back spare room equal to 2% of that hour's demand. It is not allowed to run every plant flat out.
+
+## How the plan gets made
+
+I did not ask a model to write the hourly plan. I asked it to estimate what it costs to run each kind of plant, and I let an optimizer write the plan. That split is the method. People call it a learning-to-optimize pipeline. The model learns the costs. The optimizer is the part that has to obey the four rules above.
+
+One hour goes through five steps.
+
+1. Read the public record for that hour: demand by region, weather, fuel prices, scheduled outages, and whether the lines were already under stress.
+2. A small model turns that hour into a cost for each fuel in each region. There are eleven regions and seven fuels, so that is one cost per region and fuel.
+3. An optimizer takes those costs and picks how many megawatts to run. It has to meet demand, stay under the line limits, stay inside each plant, and leave the reserve. The cheapest plan that still does all four is the one I keep for that hour.
+4. I solve the same hour a second time, using the public fuel costs instead of the model's costs, under the same four rules. That second plan is the cheapest one the public data allows. It is what I grade against.
+5. I compare the two plans. If the model's costs sent the optimizer to a more expensive mix, I update the model so the next guess points closer to that cheapest plan.
+
+I trained on 720 hours from 2020 and 2021, three passes through those hours. I checked 2022, then scored 2023 and 2024. The plan I kept only learns the costs. The 2% reserve is a fixed rule, not a number the model invents. I also tried letting the model pick its own reserve. That version is in the charts below, and it cost more.
 
 ## Conclusion
 
-The plan I kept is the ordinary one. It respects the power lines, and it holds back 2% of capacity as reserve.
+The plan I kept is the ordinary one. It respects the power lines, and it holds back a reserve equal to 2% of that hour's demand.
 
 On 2023 and 2024, that plan left less money on the table than the old schedule. The gap versus the cheapest plan the public data would allow fell from $52,755 an hour to $28,189 an hour. That is a 47% smaller gap. The bill for generating the power barely moved, from $463,109 an hour to $437,598. So this is not "the power bill fell by half." The old plan was quietly expensive relative to the best plan available. The new one is less quietly expensive. Every version I compared still produced a workable schedule for every hour.
 
