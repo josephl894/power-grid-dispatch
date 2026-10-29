@@ -1,87 +1,89 @@
-# Power Grid Dispatch Model
+# Hourly Generation Planning from Public Grid Data
 
-Every hour, New York has to decide which power plants turn on, and how much each one runs. The people who make that call see private bids from the plant owners. I did not. I had the public record: how much electricity each region used, what fuel prices did, which plants were scheduled offline, and how hard the lines between regions were working.
+Plant owners submit private bids, and New York uses those bids to decide which plants run each hour. The public record reports something else: demand in each region, fuel prices, scheduled outages, and the flow limits on the lines between regions. This study builds an hourly generation plan from that record and measures it against the cheapest plan the same public data will allow.
 
-The job was to build an hourly plan from that record and see if it could beat the old schedule on cost.
+## Constraints
 
-A plan only counts if the grid could actually run it. I held every version to the same four rules.
+Every plan in the study has to be a plan the grid could run. Four constraints define that.
 
-- **Meet demand.** Each region has to get the power it is expected to use that hour. Power can move between regions, but what leaves one region has to arrive in another.
-- **Respect the lines.** The lines between regions have published limits. The plan cannot push more power across a line than that line can carry.
-- **Stay inside the plants.** A plant cannot run above the capacity that is actually available, and it cannot jump from last hour's output faster than plants of that type have historically moved.
-- **Hold a reserve.** Some capacity has to sit ready in case a plant trips or demand comes in high. The plan I kept holds back spare room equal to 2% of that hour's demand. It is not allowed to run every plant flat out.
+1. **Demand.** Each of eleven regions receives its expected demand for the hour. Power may move between regions, and energy is conserved: what leaves one region arrives in another.
+2. **Line limits.** Flow between regions stays inside the published limits on those lines.
+3. **Plant limits.** Output stays within available capacity. The change from the previous hour stays within the historical ramp rate for that fuel.
+4. **Reserve.** Spare capacity equal to 2% of that hour's demand is held on plants that can provide it. The selected plan uses this fixed fraction, so the schedule cannot run every plant flat out.
 
-## How the plan gets made
+## Method
 
-I did not ask a model to write the hourly plan. I asked it to estimate what it costs to run each kind of plant, and I let an optimizer write the plan. That split is the method. People call it a learning-to-optimize pipeline. The model learns the costs. The optimizer is the part that has to obey the four rules above.
+The pipeline is learning-to-optimize. A model predicts costs. An optimizer writes the plan and enforces the four constraints. The model never emits megawatts directly.
 
-One hour goes through five steps.
+Each hour proceeds as follows.
 
-1. Read the public record for that hour: demand by region, weather, fuel prices, scheduled outages, and whether the lines were already under stress.
-2. A small model turns that hour into a cost for each fuel in each region. There are eleven regions and seven fuels, so that is one cost per region and fuel.
-3. An optimizer takes those costs and picks how many megawatts to run. It has to meet demand, stay under the line limits, stay inside each plant, and leave the reserve. The cheapest plan that still does all four is the one I keep for that hour.
-4. I solve the same hour a second time, using the public fuel costs instead of the model's costs, under the same four rules. That second plan is the cheapest one the public data allows. It is what I grade against.
-5. I compare the two plans. If the model's costs sent the optimizer to a more expensive mix, I update the model so the next guess points closer to that cheapest plan.
+1. The hour is represented by demand in each region, weather, fuel prices, scheduled outages, and recent stress on the lines.
+2. A linear model maps that hour to a cost for each of seven fuels in each of eleven regions.
+3. A linear program minimizes those costs subject to the four constraints. The solution is the plan for the hour.
+4. The same program is solved again with observed public fuel costs, under the same constraints. That solution is the cost benchmark: the cheapest feasible plan the public data allows.
+5. The model is updated so the next set of predicted costs produces a plan closer to that benchmark.
 
-I trained on 720 hours from 2020 and 2021, three passes through those hours. I checked 2022, then scored 2023 and 2024. The plan I kept only learns the costs. The 2% reserve is a fixed rule, not a number the model invents. I also tried letting the model pick its own reserve. That version is in the charts below, and it cost more.
+Training uses 720 hours from 2020 and 2021, for three passes. 2022 is the check year. 2023 and 2024 are the test years. The selected model learns costs only. The 2% reserve is fixed. A separate variant lets the model choose the reserve. That variant costs more, and it is included in the results below.
 
-## Conclusion
+## Results
 
-The plan I kept is the ordinary one. It respects the power lines, and it holds back a reserve equal to 2% of that hour's demand.
+The selected plan enforces the line limits and the 2% reserve. On the 2023–2024 test set it is the cheapest variant in the comparison. Every variant returns a feasible plan for every test hour.
 
-On 2023 and 2024, that plan left less money on the table than the old schedule. The gap versus the cheapest plan the public data would allow fell from $52,755 an hour to $28,189 an hour. That is a 47% smaller gap. The bill for generating the power barely moved, from $463,109 an hour to $437,598. So this is not "the power bill fell by half." The old plan was quietly expensive relative to the best plan available. The new one is less quietly expensive. Every version I compared still produced a workable schedule for every hour.
+Two numbers describe the result, and they answer different questions.
 
-The versions that look smarter were worse business. A plan that copied the historical fuel mix more closely cost about $20,500 more per hour. Letting the model pick its own reserve also cost more than just using 2%. Matching the past, and a fancier model, were not the cheaper way to run the system.
+The generation bill falls from $463,109 an hour to $437,598, about 5.5%. The extra cost above the public-data benchmark falls from $52,755 an hour to $28,189, a 47% reduction. The bill is the cost of producing the power. The extra cost is how far that bill sits above the cheapest feasible plan. The 47% figure is the second number.
 
-A utility or a trading desk that cannot see private bids can use this the same way: draft the hourly plan from the public record, force it to obey the lines and a small reserve, and grade it on dollars left above the cheapest workable plan. Do not grade it on whether the mix of gas, hydro, and wind looks like last year. This does not replace the software the grid operator actually runs.
+Variants that look more sophisticated cost more. Matching the published fuel mix more closely adds about $20,500 an hour of extra cost. Letting the model choose the reserve raises extra cost from $28,189 an hour to $29,270.
 
-## What the charts are
+A utility or a trading desk that sees the public record and not the private bids can use the same procedure: predict costs, let the optimizer enforce line limits and a small reserve, and score the plan on extra cost against the cheapest feasible plan. Fuel-mix similarity is a separate score. On this test set it points to a more expensive plan. The results are a public-data proxy of hourly scheduling, evaluated under the constraints above.
 
-Each bar or line is one version of the plan. **A0** is the old schedule. **A6c**, the orange bar, is the plan I kept: line limits plus a 2% reserve. The letters in between are the versions I tried on the way there. Shorter is better when the chart is about cost.
+## Results by variant
 
-| Version | What I changed | Bill ($/hr) | Left on the table ($/hr) |
+Each bar in the charts is one variant. **A0** is the historical schedule. **A6c**, shown in orange, is the selected plan: line limits plus the 2% reserve. The labels in between are the intermediate variants. Where the chart is a cost, shorter is better.
+
+| Variant | Change from the previous plan | Bill ($/hr) | Extra cost ($/hr) |
 | --- | --- | ---: | ---: |
-| A0 | Old schedule | 463,109 | 52,755 |
+| A0 | Historical schedule | 463,109 | 52,755 |
 | A1 | Newer public list of plant capacity | 465,540 | 55,674 |
-| A2 | Limits on the lines between regions | 445,503 | 35,637 |
+| A2 | Line limits between regions | 445,503 | 35,637 |
 | A3 | Day-ahead stress on those lines | 449,337 | 39,470 |
 | A5b | Plants known to be offline | 442,472 | 32,606 |
-| **A6c** | **Hold back 2% as reserve** | **437,598** | **28,189** |
-| A7b | Let the model choose the reserve | 438,679 | 29,270 |
+| **A6c** | **Fixed reserve of 2% of demand** | **437,598** | **28,189** |
+| A7b | Reserve chosen by the model | 438,679 | 29,270 |
 
-### Money left on the table
+### Extra cost
 
-This is the chart behind the 47%. Each bar is one version. The orange bar is the plan I kept, and it is the shortest. The chart's own title says "regret." That word means the same thing as the column above: dollars per hour above the cheapest workable plan. It is not the power bill.
+This chart is the 47% result. Each bar is one variant's extra cost: dollars per hour above the cheapest feasible plan. The figure title uses the word regret for that gap. The orange bar is A6c, the shortest bar, and the selected plan.
 
-![Money left on the table, by version. The orange bar is the plan I kept.](figures/final_scuc_proxy/01_financial_regret_by_stage.png)
+![Extra cost by variant. The orange bar is the selected plan.](figures/final_scuc_proxy/01_financial_regret_by_stage.png)
 
-### The actual bill
+### Generation bill
 
-Same versions, but this time the bars are the full cost of generating the power. The red line is the cheapest workable plan. The bars look almost the same height because a $25,000 gap is small next to a $440,000 bill. That is why the first chart exists. The bill chart hides the result. The orange bar is still the one I kept.
+The same variants, now as the full cost of generating the power. The red line is the cheapest feasible plan. The bars are nearly equal because a gap of about $25,000 is small beside a bill near $440,000. The extra-cost chart is what makes the 47% visible. The orange bar is again A6c.
 
-![Full generation bill by version. The red line is the cheapest workable plan.](figures/final_scuc_proxy/02_financial_cost_by_stage.png)
+![Generation bill by variant. The red line is the cheapest feasible plan.](figures/final_scuc_proxy/02_financial_cost_by_stage.png)
 
-### Did the reserve help every month?
+### The reserve, month by month
 
-Blue is the plan with line limits and outages, and no reserve. Orange is that same plan plus the 2% reserve. Orange is lower most months, which is why I kept it. It is not lower every month. Both lines spike in the summers.
+Blue is the plan with line limits and known outages, and no reserve (A5b). Orange is that plan plus the 2% reserve (A6c). The orange line is lower in most months, which is the basis for selecting A6c. Both lines rise in the summer months.
 
-![Month by month, plan without a reserve versus the plan I kept.](figures/final_scuc_proxy/05_monthly_regret_a5b_vs_a6c.png)
+![Monthly extra cost, plan without a reserve versus the selected plan.](figures/final_scuc_proxy/05_monthly_regret_a5b_vs_a6c.png)
 
-### Copying the fuel mix is a different goal
+### Fuel-mix error
 
-These two charts are not about the bill. They ask how many megawatts off the plan was from the mix of fuels New York actually published. Lower means a closer copy of history. Letting the model choose the reserve (A7b) wins that contest. It also costs more, which is why it is not the plan I kept. A6c is the next best on this chart and the best on the money chart.
+These two charts measure a different objective: average megawatts away from the fuel mix New York published. Lower means a closer match to history. A7b, the learned reserve, is the closest. It is also more expensive than A6c, which is why A6c remains the selected plan. A6c is second on fuel-mix error and first on extra cost.
 
-![How far each version sits from the published fuel mix.](figures/final_scuc_proxy/03_total_fuel_mix_mae_by_stage.png)
+![Fuel-mix error by variant.](figures/final_scuc_proxy/03_total_fuel_mix_mae_by_stage.png)
 
-![Same fuel-mix gap, month by month. The green line is the learned reserve.](figures/final_scuc_proxy/06_monthly_total_fuel_mix_mae.png)
+![Monthly fuel-mix error. The green line is the learned reserve.](figures/final_scuc_proxy/06_monthly_total_fuel_mix_mae.png)
 
 ## Code
 
-`run_zonal_cost_lto.py` trains the cost model and solves each hour. `nyiso_processing.py` and `nyiso_cost_processing.py` turn the public files into those hours. The charts above live in `figures/final_scuc_proxy/`.
+`run_zonal_cost_lto.py` trains the cost model and solves each hour. `nyiso_processing.py` and `nyiso_cost_processing.py` build those hours from the public files. The charts above are in `figures/final_scuc_proxy/`.
 
-The other pictures in `figures/` are an earlier attempt. That attempt guessed the next fuel mix and then patched the guess. It is not the plan in the table.
+The other images in `figures/` come from an earlier model that predicted the fuel mix and then repaired the prediction. They are separate from the cost-learning pipeline in the table.
 
-The hourly data files are large and are not in this repository. The scripts expect them under `data/processed/`.
+The hourly tables are too large for this repository. The scripts read them from `data/processed/`.
 
 ```bash
 pip install -r requirements.txt
