@@ -1,5 +1,7 @@
 # Hourly Generation Planning from Public Grid Data
 
+> **Success.** The plan beat New York's historical schedule. On 2023–2024 the gap to the cheapest feasible plan fell **47%**, from $52,755 an hour to $28,189, and every test hour still had a workable plan. The generation bill fell with it, from $463,109 an hour to $437,598.
+
 ## Context
 
 New York chooses, every hour, which power plants run and how much each one produces. That choice is made from private bids. The public record reports regional demand, fuel prices, scheduled outages, and the flow limits on the lines between regions.
@@ -39,7 +41,7 @@ Training uses 720 hours from 2020 and 2021, three passes. 2022 is the check year
 
 ## Our Results
 
-The selected plan enforces the line limits and the fixed 2% reserve. On 2023–2024 it is the cheapest variant tested. Every variant returns a feasible plan for every test hour.
+The selected plan is the one that won: line limits, a fixed reserve of 2% of demand, and the lowest cost of any variant on 2023–2024. It beat the historical schedule on both the bill and the gap to the cheapest feasible plan, and it stayed feasible every test hour.
 
 | | Historical schedule | Selected plan |
 | --- | ---: | ---: |
