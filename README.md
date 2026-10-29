@@ -6,11 +6,13 @@ Public load, price, and outage data go in. A model learns generation costs from 
 
 ## Conclusion
 
-The cost result came from the constraints, not from a more flexible learned model.
+Someone planning New York's power without seeing private generator bids still has to decide which plants should run each hour, and what that will cost. This study did that from public load, prices, and outages. The score is wasted money: how much more the plan costs than the cheapest plan the same public data would have allowed.
 
-On the 2023–2024 test hours, updating the fleet data by itself made the plan more expensive. The first large drop came from enforcing transmission limits between zones. Adding day-ahead stress on top of that, without outages, gave some of the gain back. Scheduled outages and then a fixed 2% reserve margin kept cutting the extra cost. That last plan, A6c, is the one that was kept: extra cost fell 47%, from $52,755 per hour to $28,189 per hour. The generation bill only fell from $463,109 to $437,598 per hour, about 5.5%, because the extra cost is a small slice of the bill. Every selected run solved every hour.
+The useful plan was the simple one. It refused to move power between regions as if the lines were unlimited, and it held back 2% of capacity as reserve. On 2023–2024 hours, that cut the wasted money by 47%, from $52,755 per hour to $28,189 per hour. The generation bill itself only moved from $463,109 to $437,598 per hour, about 5.5%. A 47% better plan is not a 47% cheaper power bill. Every plan in the study produced a feasible schedule for every hour.
 
-Letting the model choose the reserve, or pushing it to match the published fuel mix more closely, spent that gain. The closer fuel-mix variant cost about $20,500 per hour more in extra cost than A6c. A fixed reserve margin beat a learned one.
+Two results that look attractive were the expensive ones. A plan that copied the published fuel mix more closely wasted about $20,500 more per hour. A model allowed to choose its own reserve also cost more than the fixed 2%. Matching history, and a more elaborate model, were not the cheaper way to operate.
+
+For a utility, a market analyst, or a desk that cannot see private bids, the practical use is screening hourly plans from public data and judging them on wasted money, not on how closely the fuel mix copies the past. It does not replace the operator's real scheduling system.
 
 ## Result
 
